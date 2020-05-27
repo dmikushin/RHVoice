@@ -37,6 +37,7 @@ namespace
     bool play_speech(const short* samples,std::size_t count);
     void finish();
     bool set_sample_rate(int sample_rate);
+    bool set_buffer_size(unsigned int buffer_size);
 
   private:
     audio::playback_stream stream;
@@ -59,6 +60,21 @@ namespace
           stream.close();
         stream.set_sample_rate(sample_rate);
         return true;
+      }
+    catch(...)
+      {
+        return false;
+      }
+  }
+
+  bool audio_player::set_buffer_size(unsigned int buffer_size)
+  {
+    try
+      {
+        if(stream.is_open()&&(stream.get_buffer_size()!=buffer_size))
+          stream.close();
+        stream.set_buffer_size(buffer_size);
+	return true;
       }
     catch(...)
       {
@@ -112,6 +128,7 @@ int main(int argc,const char* argv[])
         }
       audio_player player(outpath_arg.getValue());
       player.set_sample_rate(sample_rate.getValue());
+      player.set_buffer_size(20);
       smart_ptr<engine> eng(new engine);
       voice_profile profile;
       if(!voice_arg.getValue().empty())
