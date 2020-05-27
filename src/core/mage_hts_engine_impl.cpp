@@ -177,37 +177,36 @@ namespace RHVoice
     frame_t f;
     f.index=num_frames;
     while(!(output->is_stopped()||fq->isEmpty()))
-      {
-        MAGE::Frame* f0=fq->get();
-        std::copy(f0->streams[MAGE::mgcStreamIndex],f0->streams[MAGE::mgcStreamIndex]+mgc_order+1,f.mgc);
-  std::copy(f0->streams[MAGE::bapStreamIndex],f0->streams[MAGE::bapStreamIndex]+bap_order+1,f.ap);
-  for(int i=0;i<=bap_order;++i)
     {
-      if(f.ap[i]>0)
-        f.ap[i]=0;
-      f.ap[i]=std::pow(10.0,f.ap[i]/10.0);
-    }
-  f.voiced=f0->voiced;
-        f.lf0=(f0->voiced)?(f0->streams[MAGE::lf0StreamIndex][0]):LZERO;
-        fq->pop();
-        if(pitch_editor.has_work())
-          {
-            if(f.voiced)
-              pitch_editor.append(f.lf0);
-            else
-              pitch_editor.append();
-            frames.push(f);
-            do_generate_samples();
-}
-        else
-          {
-            if(f.voiced)
-              f.lf0+=pitch_shift;
-            do_generate_samples(f);
-}
-        ++f.index;
-        ++num_frames;
+      MAGE::Frame* f0=fq->get();
+      std::copy(f0->streams[MAGE::mgcStreamIndex],f0->streams[MAGE::mgcStreamIndex]+mgc_order+1,f.mgc);
+      std::copy(f0->streams[MAGE::bapStreamIndex],f0->streams[MAGE::bapStreamIndex]+bap_order+1,f.ap);
+      for(int i=0;i<=bap_order;++i)
+      {
+        if(f.ap[i]>0) f.ap[i]=0;
+        f.ap[i]=std::pow(10.0,f.ap[i]/10.0);
       }
+      f.voiced=f0->voiced;
+      f.lf0=(f0->voiced)?(f0->streams[MAGE::lf0StreamIndex][0]):LZERO;
+      fq->pop();
+      if(pitch_editor.has_work())
+      {
+        if(f.voiced)
+          pitch_editor.append(f.lf0);
+        else
+          pitch_editor.append();
+        frames.push(f);
+        do_generate_samples();
+      }
+      else
+      {
+        if(f.voiced)
+          f.lf0+=pitch_shift;
+        do_generate_samples(f);
+      }
+      ++f.index;
+      ++num_frames;
+    }
   }
 
   bool mage_hts_engine_impl::supports_quality(quality_t q) const
@@ -223,7 +222,7 @@ namespace RHVoice
   {
     sample_rate=get_sample_rate_for_quality(quality);
     switch(sample_rate.get())
-      {
+    {
       case sample_rate_16k:
         frame_shift=80;
         alpha=0.42;
@@ -235,32 +234,31 @@ namespace RHVoice
         alpha=0.466;
         mgc_order=30;
         bap_order=(info.get_format()==3)?11:6;
-        break;
-}
-    speech.resize(frame_shift,0);
-}
+    }
+    speech.resize(frame_shift);
+  }
 
   void mage_hts_engine_impl::do_generate_samples(frame_t& f)
   {
-        HTS_Vocoder_synthesize(vocoder.get(),mgc_order,f.lf0,&(f.mgc[0]),&(f.ap[0]),&bpf,alpha,beta,1,&(speech[0]),0);
-        for(int i=0;i<frame_shift;++i)
-          {
-            speech[i]/=32768.0;
-          }
-        output->process(&(speech[0]),frame_shift);
-}
+    if (!speech.size())
+      return;
+    HTS_Vocoder_synthesize(vocoder.get(),mgc_order,f.lf0,&(f.mgc[0]),&(f.ap[0]),&bpf,alpha,beta,1,&speech[0],0);
+    for(int i=0;i<speech.size(); i++)
+      speech[i] /= 32768.0;
+    output->process(&speech[0],speech.size());
+  }
 
   void mage_hts_engine_impl::do_generate_samples()
   {
     while(!output->is_stopped()&&!frames.empty())
-      {
-        frame_t& f=frames.front();
-        if(!pitch_editor.has_result(f.index))
-          return;
-        if(f.voiced)
-          f.lf0=pitch_editor.get_result(f.index)+pitch_shift;
-        do_generate_samples(f);
-        frames.pop();
-}
-}
+    {
+      frame_t& f=frames.front();
+      if(!pitch_editor.has_result(f.index))
+        return;
+      if(f.voiced)
+        f.lf0=pitch_editor.get_result(f.index)+pitch_shift;
+      do_generate_samples(f);
+      frames.pop();
+    }
+  }
 }
